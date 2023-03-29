@@ -1,0 +1,67 @@
+trigger: none
+# Specifies the VM image that the pipeline should use to run the tasks.
+# Azure DevOps provides a number of pre-configured VM images that you can use, such as Ubuntu, Windows, and macOS.
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+  parameters:
+    rootdirectory: "/Environments"
+    - stage: terraformValidate
+      jobs:
+        - job: validate
+          # The job will quit if it fails
+          continueOnError: false
+          steps:
+          # Checkout: This task checks out the code from the repository.
+          - checkout: self
+
+          # Installs the terraform version of 0.14.0 onto the VM
+          - task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@0
+            displayName: "Terraform Install Version latest"
+            inputs:
+              terraformVersion: '0.14.0'
+
+          # Terraform Init: This task initializes the Terraform working directory.
+          - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV2@2
+            displayName: "Terraform Init"
+            inputs:
+              provider: "azurerm"
+              command: "init"
+              workingDirectory: "$(System.DefaultWorkingDirectory)/terraform"
+              backendServiceArm: ${{ parameters.serviceConnectionName }}
+              backendAzureRmResourceGroupName: 'Terraform'
+              backendAzureRmStorageAccountName: 'teraformstorage1212'
+              backendAzureRmContainerName: 'tfstate'
+              backendAzureRmKey: 'terraform.tfstate'
+
+        # Terraform Plan: This task generates an execution plan for Terraform.
+        - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV2@2
+          displayName: 'Terraform Plan'
+          inputs:
+            provider: "azurerm"
+            command: 'plan'
+            workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+
+        # Terraform Apply: This task applies the changes to the infrastructure.
+        - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV2@2
+          displayName: "Terraform Apply"
+          inputs:
+            provider: "azurerm"
+            command: "apply"
+            workingDirectory: "$(System.DefaultWorkingDirectory)/terraform"
+            
+    - stage: terraformDestroy
+      # this only runs if the previous code is validated
+      condition: succeeded('terraformValidate')
+      dependsOn: terraformValidate
+      jobs:
+        - job: destroy
+          steps:
+            # Terraform Destroy: This task destroys the infrastructure.
+            - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV2@2
+              displayName: 'Terraform Destroy'
+              inputs:
+                provider: "azurerm"
+                command: 'destroy'
+                workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'

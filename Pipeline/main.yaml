@@ -1,0 +1,35 @@
+# This is an example YAML file to deploy Azure Web App using Terraform
+
+# Set the job name
+job:
+  job_template: azure-terraform
+
+# Set the Terraform version
+terraform:
+  version: '1.1.0'
+
+# Set the required environment variables for authentication
+env:
+  ARM_CLIENT_ID: <Azure service principal client ID>
+  ARM_CLIENT_SECRET: <Azure service principal client secret>
+  ARM_SUBSCRIPTION_ID: <Azure subscription ID>
+  ARM_TENANT_ID: <Azure Active Directory tenant ID>
+
+# Set the deployment steps
+steps:
+  - name: Checkout code
+    uses: actions/checkout@v2
+
+  - name: Setup Terraform
+    uses: hashicorp/setup-terraform@v1
+    with:
+      terraform_version: ${{ terraform.version }}
+
+  - name: Terraform Init
+    run: terraform init
+
+  - name: Terraform Plan
+    run: terraform plan
+
+  - name: Terraform Apply
+    run: terraform apply -auto-approve
